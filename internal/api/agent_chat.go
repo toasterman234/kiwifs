@@ -91,8 +91,8 @@ func isAgentLoopback(host string) bool {
 
 func (b *agentBridge) authorize(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		expected := []byte("Bearer " + b.access)
-		actual := []byte(c.Request().Header.Get("Authorization"))
+		expected := []byte(b.access)
+		actual := []byte(c.Request().Header.Get("X-Kiwi-Agent-Key"))
 		if subtle.ConstantTimeCompare(expected, actual) != 1 {
 			return echo.NewHTTPError(http.StatusUnauthorized, "agent chat access key required")
 		}
