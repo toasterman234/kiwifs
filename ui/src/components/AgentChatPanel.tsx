@@ -5,7 +5,7 @@ import { kiwiFileVersion, kiwiHostHeaders } from "@kw/lib/api";
 type Session = { id: string; title: string };
 type Selection = { quote: string };
 type MessagePart = { type: string; text?: string; name?: string; state?: { status?: string } };
-type Message = { id: string; type: string; text?: string; parts?: MessagePart[] };
+type Message = { id: string; type: string; text?: string; content?: MessagePart[] };
 type Permission = { id: string; action: string; resources?: string[]; message?: string };
 type Info = { enabled: boolean; agent?: string };
 type Props = {
@@ -31,7 +31,7 @@ function collect<T>(payload: unknown): T[] {
 }
 function messageBody(message: Message): string {
   if (typeof message.text === "string") return message.text;
-  return (message.parts ?? []).filter((part) => part.type === "text" && typeof part.text === "string")
+  return (message.content ?? []).filter((part) => part.type === "text" && typeof part.text === "string")
     .map((part) => part.text).join("\n");
 }
 function initialSession(): string {
@@ -144,7 +144,7 @@ export function AgentChatPanel({ open, path, space, editing, selection, onClose 
           call<unknown>("/sessions/" + id + "/permissions"),
         ]);
         if (cancelled) return;
-        setMessages(collect<Message>(history));
+        setMessages(collect<Message>(history).reverse());
         setActive(Boolean(activity.active));
         setPermissions(collect<Permission>(requests));
         setError("");
@@ -246,7 +246,7 @@ export function AgentChatPanel({ open, path, space, editing, selection, onClose 
             {messages.map((message) => {
               if (message.type !== "user" && message.type !== "assistant") return null;
               const body = messageBody(message);
-              const tools = (message.parts ?? []).filter((part) => part.type === "tool");
+              const tools = (message.content ?? []).filter((part) => part.type === "tool");
               if (!body && tools.length === 0) return null;
               return (
                 <div key={message.id} className={"rounded-lg p-3 text-sm " + (message.type === "user" ? "ml-5 bg-accent" : "mr-3 border border-border")}>
