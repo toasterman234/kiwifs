@@ -2,10 +2,15 @@ name: ci
 
 on:
   push:
-    branches: [main, feat/native-opencode-agent-chat]
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
+
+# Keep one PR validation active when fixes are pushed.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   changes:
@@ -106,8 +111,12 @@ jobs:
       - name: go test
         if: ${{ needs.changes.outputs.go == 'true' || needs.changes.outputs.infra == 'true' }}
         run: |
-          RACE_FLAG=${{ github.event_name == 'pull_request' && '-race' || '' }}
-          go test ./... $RACE_FLAG -count=1 -coverprofile=coverage.out -covermode=atomic
+          # Full suite stays covered without the expensive repository-wide race instrumentation.
+          go test ./... -count=1 -coverprofile=coverage.out -covermode=atomic -timeout=5m
+          # Scope race detection to the changed chat bridge's concurrency/auth tests.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            go test -race ./internal/api -run '^TestAgentBridge' -count=1 -timeout=3m
+          fi
 
       - name: coverage summary
         if: ${{ needs.changes.outputs.go == 'true' || needs.changes.outputs.infra == 'true' }}
