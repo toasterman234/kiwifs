@@ -53,7 +53,7 @@ func TestAgentBridgeScopesSessionsToKiwiFS(t *testing.T) {
 	b, done := fakeAgentBridge(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if r.URL.Path == "/api/session/ses_allowed" {
-			_, _ = w.Write([]byte("{\"data\":{\"id\":\"ses_allowed\",\"title\":\"KiwiFS ben-pa · Chat\"}}"))
+			_, _ = w.Write([]byte("{\"data\":{\"id\":\"ses_allowed\",\"title\":\"KiwiFS ben-pa · Chat\",\"agent\":\"ben-pa\"}}"))
 			return
 		}
 		_, _ = w.Write([]byte("{\"data\":{\"id\":\"ses_other\",\"title\":\"bb private conversation\"}}"))
@@ -76,7 +76,7 @@ func TestAgentBridgeContextAndPermissionBoundary(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/api/session/ses_allowed":
-			_, _ = w.Write([]byte("{\"data\":{\"id\":\"ses_allowed\",\"title\":\"KiwiFS ben-pa · Chat\"}}"))
+			_, _ = w.Write([]byte("{\"data\":{\"id\":\"ses_allowed\",\"title\":\"KiwiFS ben-pa · Chat\",\"agent\":\"ben-pa\"}}"))
 		case "/api/session/ses_allowed/prompt":
 			raw, _ := io.ReadAll(r.Body)
 			var prompt struct{ Text string }
