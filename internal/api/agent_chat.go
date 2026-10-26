@@ -29,6 +29,7 @@ type agentBridge struct {
 	client  *http.Client
 	access  string
 	pass    string
+	user    string
 	agent   string
 	workdir string
 }
@@ -74,8 +75,12 @@ func agentBridgeFromEnvironment() *agentBridge {
 		log.Print("agent chat disabled: invalid KIWIFS_AGENT_NAME")
 		return nil
 	}
+	user := strings.TrimSpace(os.Getenv("KIWIFS_AGENT_OPENCODE_USERNAME"))
+	if user == "" {
+		user = "opencode"
+	}
 	return &agentBridge{
-		service: u, access: access, pass: os.Getenv("KIWIFS_AGENT_OPENCODE_PASSWORD"), agent: agent,
+		service: u, access: access, pass: os.Getenv("KIWIFS_AGENT_OPENCODE_PASSWORD"), user: user, agent: agent,
 		workdir: strings.TrimSpace(os.Getenv("KIWIFS_AGENT_WORKDIR")),
 		client: &http.Client{Timeout: 20 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
 			return http.ErrUseLastResponse
@@ -130,7 +135,9 @@ func (b *agentBridge) upstream(ctx context.Context, method, path string, data an
 		req.Header.Set("Content-Type", "application/json")
 	}
 	if b.pass != "" {
-		req.SetBasicAuth("opencode", b.pass)
+		username := b.user
+		if username == "" { username = "opencode" }
+		req.SetBasicAuth(username, b.pass)
 	}
 	resp, err := b.client.Do(req)
 	if err != nil {
