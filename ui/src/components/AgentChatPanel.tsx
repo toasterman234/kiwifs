@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Bot, Check, CircleAlert, LockKeyhole, MessageSquare, Plus, Send, X } from "lucide-react";
-import { kiwiFileVersion, kiwiHostHeaders } from "@kw/lib/api";
+import { api, kiwiHostHeaders } from "@kw/lib/api";
 
 type Session = { id: string; title: string };
 type Selection = { quote: string };
@@ -163,12 +163,20 @@ export function AgentChatPanel({ open, path, space, editing, selection, onClose 
     setPending(true);
     setError("");
     try {
-      let context: { path: string; space: string; version?: string; draft?: boolean; selection?: Selection } | undefined;
+      let context: { path: string; space: string; version?: string; draft?: boolean; content?: string; truncated?: boolean; selection?: Selection } | undefined;
       if (attached && path) {
-        const version = await kiwiFileVersion(path).catch(() => null);
+        // Read through KiwiFS's normal authenticated API; do not assume
+        // OpenCode can access this workspace or silently drop failed reads.
+        const file = await api.readFile(path);
         context = { path, space, draft: editing };
-        if (version) context.version = version;
-        if (attached === "selection" && selection.trim()) context.selection = { quote: selection.slice(0, 4000) };
+        if (file.etag) context.version = file.etag;
+        if (attached === "page") {
+          context.content = file.content.slice(0, 8000);
+          context.truncated = file.content.length > 8000;
+        }
+        if (attached === "selection" && selection.trim()) {
+          context.selection = { quote: selection.slice(0, 4000) };
+        }
       }
       await call("/sessions/" + encodeURIComponent(sessionId) + "/messages", {
         method: "POST",
