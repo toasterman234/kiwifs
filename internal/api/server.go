@@ -547,6 +547,8 @@ func (s *Server) setupRoutes() {
 	api.GET("/diff", h.Diff)
 	api.GET("/blame", h.Blame)
 	api.GET("/events", h.Events)
+	// Separate, opt-in service bridge. Disabled unless configured by the server owner.
+	s.registerAgentRoutes(api)
 	api.GET("/backlinks", h.Backlinks)
 	api.GET("/graph", h.Graph)
 	api.GET("/toc", h.ToC)
