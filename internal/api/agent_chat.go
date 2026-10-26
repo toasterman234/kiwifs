@@ -267,7 +267,7 @@ func (b *agentBridge) messages(c echo.Context) error {
 	if err := b.ownedSession(c.Request().Context(), c.Param("id")); err != nil {
 		return err
 	}
-	raw, status, err := b.upstream(c.Request().Context(), http.MethodGet, "/api/session/"+c.Param("id")+"/message?limit=100&order=asc", nil)
+	raw, status, err := b.upstream(c.Request().Context(), http.MethodGet, "/api/session/"+c.Param("id")+"/message?limit=100&order=desc", nil)
 	if err != nil {
 		return agentFailure(err, status)
 	}
