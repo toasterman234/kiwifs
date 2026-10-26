@@ -34,8 +34,8 @@ Only serve the chat UI through trusted HTTPS (or local loopback); user-entered c
 
 - Desktop right panel and mobile full-viewport conversation.
 - Explicit session create/switch; message history and tool activity updated by 1.5-second polling.
-- `Attach page` adds KiwiFS space, path, and saved file ETag when available.
-- `Attach selection` adds selected quote, labeled as unsaved/draft if editing.
+- `Attach page` reads the current file through the normal KiwiFS authenticated API and includes the first 8,000 characters of document content, with space, path, ETag and an explicit truncation marker when needed. Reads failing do not silently degrade to path-only context.
+- `Attach selection` includes selected quote, space, path and saved file ETag, labeled as potentially unsaved/draft if editing; richer CodeMirror/BlockNote selection integration is not verified.
 - Pending permission requests show *Allow once* and *Reject* only. The runtime still decides whether actions are authorized.
 - Requests fail closed for missing or short chat keys and invalid remote HTTP endpoints.
 
@@ -60,3 +60,10 @@ Keep the feature on its own branch until reviewed. Do not merge a failing or unv
 - [KiwiFS source and agent rules](https://github.com/kiwifs/kiwifs/blob/main/AGENTS.md)
 - [OpenCode V2 HTTP API](https://dev.opencode.ai/v2/docs/api)
 - [Bec1 exploration](https://github.com/toasterman234/Bec1/blob/main/Research%20-%20KiwiFS%20agent%20chat%20integration%202026-10-26.md)
+
+## Current validation checkpoint (2026-10-26)
+
+- Latest feature revision `acedbb3bb5f705d99364521debf15ea0f3c0feca`: isolated [TypeScript check passed](https://github.com/toasterman234/github-workflows-control-plane/actions/runs/40395445551) and [frontend production build passed](https://github.com/toasterman234/github-workflows-control-plane/actions/runs/40395451832). A later docs-only commit is not itself deployed.
+- Go bridge malformed multiline string literals found during review and corrected in commit `d04e6c2062591c6d5f955826ebc982f1e56d6e97`; **Go compilation still unverified** because the Mac control-plane command allowlist correctly rejects `go`, and no GitHub Actions run was returned for the fork PR.
+- `npm test` on Mac: 1,102 passed / 15 `KiwiEditor` failures; exact same 15 reproduced on unchanged fork `main`. These remain failing tests, but not a regression introduced by chat.
+- OpenCode service reachable on loopback, but `/api/info` returned 401 without credentials; no authenticated session/prompt verification or deployment.
