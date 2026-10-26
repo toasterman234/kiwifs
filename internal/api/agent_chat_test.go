@@ -94,7 +94,7 @@ func TestAgentBridgeContextAndPermissionBoundary(t *testing.T) {
 	e := echo.New()
 	e.POST("/sessions/:id/messages", b.send, b.authorize)
 	e.POST("/sessions/:id/permissions/:request/reply", b.reply, b.authorize)
-	payload := "{\"text\":\"Review this\",\"context\":{\"path\":\"plan.md\",\"space\":\"docs\",\"version\":\"etag123\",\"selection\":{\"quote\":\"scope decision\"}}}"
+	payload := "{\"text\":\"Review this\",\"context\":{\"path\":\"plan.md\",\"space\":\"docs\",\"version\":\"etag123\",\"content\":\"Document body for review\",\"truncated\":false,\"selection\":{\"quote\":\"scope decision\"}}}"
 	req := httptest.NewRequest(http.MethodPost, "/sessions/ses_allowed/messages", strings.NewReader(payload))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Kiwi-Agent-Key", b.access)
@@ -104,7 +104,7 @@ func TestAgentBridgeContextAndPermissionBoundary(t *testing.T) {
 		t.Fatalf("prompt status %d: %s", resp.Code, resp.Body.String())
 	}
 	if !strings.Contains(promptText, "Selected quote:\nscope decision") ||
-		!strings.Contains(promptText, "ETag: etag123") || !strings.Contains(promptText, "User request:\nReview this") {
+		!strings.Contains(promptText, "ETag: etag123") || !strings.Contains(promptText, "Document body for review") || !strings.Contains(promptText, "User request:\nReview this") {
 		t.Fatalf("missing context provenance in prompt: %q", promptText)
 	}
 	req = httptest.NewRequest(http.MethodPost, "/sessions/ses_allowed/permissions/per_example/reply", strings.NewReader("{\"decision\":\"always\"}"))
