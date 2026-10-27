@@ -36,6 +36,7 @@ type autolithBridge struct {
 	pending map[uint64]chan autolithRPCResult
 	sessions map[string]*autolithSession
 	permissions map[string]*autolithPermission
+	busy bool
 }
 
 type autolithRPCResult struct {
@@ -343,8 +344,9 @@ User request:
 "+request.Text
 	}
 	a.mu.Lock()
-	if s.Active {a.mu.Unlock();return echo.NewHTTPError(http.StatusConflict,"Autolith is already processing this session")}
+	if a.busy {a.mu.Unlock();return echo.NewHTTPError(http.StatusConflict,"Autolith is already processing a turn")}
 	s.Active=true
+	a.busy=true
 	s.Assistant=nil
 	s.Messages=append(s.Messages,&autolithChatMessage{ID:autolithID(),Type:"user",Content:[]autolithChatPart{{Type:"text",Text:request.Text}}})
 	a.mu.Unlock()
@@ -356,6 +358,8 @@ User request:
 			s.Messages=append(s.Messages,&autolithChatMessage{ID:autolithID(),Type:"assistant",Content:[]autolithChatPart{{Type:"text",Text:"Autolith prompt failed or timed out; check server diagnostics."}}})
 		}
 		s.Active=false
+		a.busy=false
+		for id,p:=range a.permissions {if p.SessionID==s.ID {delete(a.permissions,id)}}
 		a.mu.Unlock()
 	}()
 	return c.JSON(http.StatusAccepted,map[string]bool{"accepted":true})
@@ -364,6 +368,15 @@ func (a *autolithBridge) activity(c echo.Context) error {
 	s,err:=a.session(c.Param("id"));if err!=nil{return err}
 	a.mu.Lock();active:=s.Active;a.mu.Unlock()
 	return c.JSON(http.StatusOK,map[string]bool{"active":active})
+}
+func (a *autolithBridge) cancel(c echo.Context) error {
+	s,err:=a.session(c.Param("id"));if err!=nil{return err}
+	a.mu.Lock();active:=s.Active;a.mu.Unlock()
+	if !active {return c.NoContent(http.StatusNoContent)}
+	if err:=a.write(map[string]any{"jsonrpc":"2.0","method":"session/cancel","params":map[string]string{"sessionId":s.ID}});err!=nil {
+		return echo.NewHTTPError(http.StatusBadGateway,"could not cancel Autolith turn")
+	}
+	return c.NoContent(http.StatusNoContent)
 }
 func (a *autolithBridge) permissionList(c echo.Context) error {
 	s,err:=a.session(c.Param("id"));if err!=nil{return err}
@@ -401,6 +414,7 @@ func (s *Server) registerAutolithRoutes(api *echo.Group, a *autolithBridge) {
 	group.GET("/sessions/:id/messages",a.messages)
 	group.POST("/sessions/:id/messages",a.send)
 	group.GET("/sessions/:id/activity",a.activity)
+	group.POST("/sessions/:id/cancel",a.cancel)
 	group.GET("/sessions/:id/permissions",a.permissionList)
 	group.POST("/sessions/:id/permissions/:request/reply",a.reply)
 }
