@@ -211,6 +211,14 @@ export function AgentChatPanel({ open, path, space, editing, selection, onClose 
     } finally { setPending(false); }
   };
 
+  async function cancelAutolith() {
+    if (!sessionId || backend !== "autolith" || !active) return;
+    setError("");
+    try {
+      await call("/sessions/" + encodeURIComponent(sessionId) + "/cancel", { method: "POST" });
+    } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
+  }
+
   async function reply(permission: Permission, decision: "once" | "reject") {
     if (!sessionId) return;
     setLoading(true);
@@ -237,6 +245,7 @@ export function AgentChatPanel({ open, path, space, editing, selection, onClose 
           {info.backends.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </select>}
         {connected && <span className={"ml-1 text-[11px] " + (active ? "text-primary" : "text-muted-foreground")} role="status">{active ? "Working…" : "Idle"}</span>}
+        {connected && active && backend === "autolith" && <button type="button" onClick={() => void cancelAutolith()} className="rounded border border-border px-2 py-1 text-xs">Stop</button>}
         <div className="flex-1" />
         {connected && <button type="button" onClick={() => void startSession()} disabled={loading}
           aria-label="New agent conversation" title="New conversation"
