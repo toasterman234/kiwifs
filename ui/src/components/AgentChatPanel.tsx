@@ -7,7 +7,8 @@ type Selection = { quote: string };
 type MessagePart = { type: string; text?: string; name?: string; state?: { status?: string } };
 type Message = { id: string; type: string; text?: string; content?: MessagePart[] };
 type Permission = { id: string; action: string; resources?: string[]; message?: string };
-type Info = { enabled: boolean; agent?: string };
+type Backend = "opencode" | "autolith";
+type Info = { enabled: boolean; agent?: string; backends?: { id: Backend; name: string }[] };
 type Props = {
   open: boolean;
   path: string | null;
@@ -40,6 +41,7 @@ function initialSession(): string {
 
 export function AgentChatPanel({ open, path, space, editing, selection, onClose }: Props) {
   const [info, setInfo] = useState<Info | null>(null);
+  const [backend, setBackend] = useState<Backend>("opencode");
   // Only store the chat key in memory, never persistent browser storage.
   const [key, setKey] = useState("");
   const [connected, setConnected] = useState(false);
@@ -55,7 +57,7 @@ export function AgentChatPanel({ open, path, space, editing, selection, onClose 
   const [loading, setLoading] = useState(false);
 
   const call = useCallback(async <T,>(route: string, init: RequestInit = {}): Promise<T> => {
-    const res = await fetch("/api/kiwi/agent" + route, {
+    const res = await fetch("/api/kiwi/agent" + (backend === "autolith" ? "/autolith" : "") + route, {
       ...init,
       headers: {
         ...kiwiHostHeaders(),
@@ -70,7 +72,7 @@ export function AgentChatPanel({ open, path, space, editing, selection, onClose 
     }
     if (res.status === 204) return undefined as T;
     return (await res.json()) as T;
-  }, [key]);
+  }, [key, backend]);
 
   useEffect(() => {
     if (!open) return;
@@ -80,7 +82,13 @@ export function AgentChatPanel({ open, path, space, editing, selection, onClose 
         if (!res.ok) throw new Error("Chat configuration unavailable");
         return res.json() as Promise<Info>;
       })
-      .then((value) => { if (current) setInfo(value); })
+      .then((value) => { if (current) {
+          setInfo(value);
+          if (value.backends && !value.backends.some((item) => item.id === backend)) {
+            const next = value.backends[0]?.id;
+            if (next) switchBackend(next);
+          }
+        } })
       .catch(() => { if (current) setError("Could not read chat configuration"); });
     return () => { current = false; };
   }, [open]);
@@ -90,6 +98,20 @@ export function AgentChatPanel({ open, path, space, editing, selection, onClose 
     setSessions(response.sessions || []);
     return response.sessions || [];
   }, [call]);
+
+  function switchBackend(next: Backend) {
+    if (next === backend) return;
+    setBackend(next);
+    setConnected(false);
+    setSessions([]);
+    setMessages([]);
+    setPermissions([]);
+    setActive(false);
+    setAttached(null);
+    setError("");
+    try { setSessionId(sessionStorage.getItem(savedSessionKey + "-" + next) || ""); }
+    catch { setSessionId(""); }
+  }
 
   async function connect() {
     if (!key) return;
@@ -122,10 +144,10 @@ export function AgentChatPanel({ open, path, space, editing, selection, onClose 
 
   useEffect(() => {
     try {
-      if (sessionId) sessionStorage.setItem(savedSessionKey, sessionId);
-      else sessionStorage.removeItem(savedSessionKey);
+      if (sessionId) sessionStorage.setItem(savedSessionKey + "-" + backend, sessionId);
+      else sessionStorage.removeItem(savedSessionKey + "-" + backend);
     } catch { /* Optional UI preference only. */ }
-  }, [sessionId]);
+  }, [sessionId, backend]);
 
   useEffect(() => {
     if (!connected || !sessionId || !open) return;
@@ -208,7 +230,12 @@ export function AgentChatPanel({ open, path, space, editing, selection, onClose 
       className={(open ? "flex" : "hidden") + " fixed inset-0 z-40 flex-col border-l border-border bg-background md:relative md:inset-auto md:z-auto md:w-[390px] md:min-w-[310px] md:max-w-[45vw] md:shrink-0"}>
       <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
         <Bot className="h-4 w-4 text-primary" aria-hidden />
-        <span className="text-sm font-semibold">{info?.agent || "Agent chat"}</span>
+        <span className="text-sm font-semibold">{backend === "autolith" ? "Autolith" : (info?.backends?.find((item) => item.id === "opencode")?.name || info?.agent || "Agent chat")}</span>
+        {info?.backends && info.backends.length > 1 && <select aria-label="Choose agent" value={backend}
+          onChange={(event) => switchBackend(event.target.value as Backend)}
+          className="max-w-24 rounded border border-input bg-background px-1 py-1 text-xs">
+          {info.backends.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+        </select>}
         {connected && <span className={"ml-1 text-[11px] " + (active ? "text-primary" : "text-muted-foreground")} role="status">{active ? "Working…" : "Idle"}</span>}
         <div className="flex-1" />
         {connected && <button type="button" onClick={() => void startSession()} disabled={loading}
@@ -222,7 +249,7 @@ export function AgentChatPanel({ open, path, space, editing, selection, onClose 
         <div className="space-y-2 p-5 text-sm text-muted-foreground">
           <CircleAlert className="h-5 w-5" aria-hidden />
           {info === null ? "Checking chat configuration…" : "Agent chat is disabled on this server."}
-          <p className="text-xs">Set the server-side OpenCode URL and chat access key to enable it. No separate agent is created.</p>
+          <p className="text-xs">Configure the server-side OpenCode or Autolith backend and a chat access key to enable it.</p>
         </div>
       ) : !connected ? (
         <form className="space-y-3 p-4" onSubmit={(event) => { event.preventDefault(); void connect(); }}>
@@ -244,7 +271,7 @@ export function AgentChatPanel({ open, path, space, editing, selection, onClose 
               className="min-w-0 flex-1 rounded-md border border-input bg-background px-2 py-1.5 text-xs">
               {!sessionId && <option value="">Select a conversation</option>}
               {sessions.map((session) => (
-                <option key={session.id} value={session.id}>{session.title.replace(/^KiwiFS ben-pa · /, "")} · {session.id.slice(-6)}</option>
+                <option key={session.id} value={session.id}>{session.title.replace(/^KiwiFS ben-pa · /, "").replace(/^Autolith · /, "")} · {session.id.slice(-6)}</option>
               ))}
             </select>
           </div>
@@ -259,7 +286,7 @@ export function AgentChatPanel({ open, path, space, editing, selection, onClose 
               return (
                 <div key={message.id} className={"rounded-lg p-3 text-sm " + (message.type === "user" ? "ml-5 bg-accent" : "mr-3 border border-border")}>
                   <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    {message.type === "user" ? "You" : info.agent}
+                    {message.type === "user" ? "You" : (backend === "autolith" ? "Autolith" : info?.agent)}
                   </div>
                   {body && <div className="whitespace-pre-wrap break-words leading-relaxed">{body}</div>}
                   {tools.map((tool, i) => (
