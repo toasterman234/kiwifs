@@ -265,6 +265,20 @@ export function sseUrl(): string {
   return `${kiwiBase()}/events`;
 }
 
+/** Existing host/auth headers used when talking to a same-origin optional extension. */
+export function kiwiHostHeaders(): Record<string, string> {
+  return { ..._extraHeaders };
+}
+
+/** Resolve the persisted Git blob ETag before attaching a document to an agent prompt. */
+export async function kiwiFileVersion(path: string): Promise<string | null> {
+  const res = await fetch(`${kiwiBase()}/file?path=${encodeURIComponent(path)}`, {
+    headers: { ..._extraHeaders },
+  });
+  if (!res.ok) throw new ApiError(res.status, res.statusText, "", res.url);
+  return res.headers.get("ETag");
+}
+
 function actor(): string {
   try {
     return localStorage.getItem("kiwifs-actor") || DEFAULT_ACTOR;

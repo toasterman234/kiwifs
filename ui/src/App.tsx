@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Bot,
   Clock4,
   Columns3,
   Database,
@@ -86,6 +87,7 @@ import { isMarkdown, isCanvasFile, isExcalidrawFile } from "./lib/paths";
 import { type TreeRevealRequest } from "./lib/treeReveal";
 import { invalidatePagePreview } from "./lib/pagePreview";
 import { HostToolbarActions } from "./components/HostToolbarActions";
+import { AgentChatPanel } from "./components/AgentChatPanel";
 
 // The URL the app was opened with. Captured once, because the app rewrites
 // window.location as it boots and the reconciliation below still needs to see
@@ -121,6 +123,8 @@ export default function App() {
   const [activePath, setActivePath] = useState<string | null>(getInitialActivePath);
   const [treeLoading, setTreeLoading] = useState(true);
   const [editing, setEditing] = useState(false);
+  const [agentChatOpen, setAgentChatOpen] = useState(false);
+  const [agentSelection, setAgentSelection] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string | undefined>();
@@ -173,6 +177,19 @@ export default function App() {
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
   }, []);
+
+  useEffect(() => {
+    const captureSelection = () => {
+      const selected = window.getSelection();
+      const content = document.querySelector("main");
+      if (!selected || selected.isCollapsed || !content || !content.contains(selected.anchorNode)) return;
+      const quote = selected.toString().trim();
+      if (quote) setAgentSelection(quote.slice(0, 4000));
+    };
+    document.addEventListener("selectionchange", captureSelection);
+    return () => document.removeEventListener("selectionchange", captureSelection);
+  }, []);
+  useEffect(() => { setAgentSelection(""); }, [activePath]);
 
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     if (typeof window !== "undefined" && window.innerWidth < 768) return false;
@@ -843,6 +860,9 @@ const handleSpaceSwitch = useCallback(() => {
               }}
             />
             <HostToolbarActions />
+            <ToolbarButton onClick={() => setAgentChatOpen((wasOpen) => !wasOpen)} label={agentChatOpen ? "Close agent chat" : "Open agent chat"}>
+              <Bot className="h-4 w-4" />
+            </ToolbarButton>
             <ToolbarButton onClick={() => setShortcutsOpen(true)} label="Keyboard shortcuts">
               <HelpCircle className="h-4 w-4" />
             </ToolbarButton>
@@ -1059,6 +1079,14 @@ const handleSpaceSwitch = useCallback(() => {
               </div>
             )}
           </main>
+          <AgentChatPanel
+            open={agentChatOpen}
+            onClose={() => setAgentChatOpen(false)}
+            path={activePath}
+            space={currentSpace}
+            editing={editing}
+            selection={agentSelection}
+          />
         </div>
         </div>
       </KanbanDragProvider>
