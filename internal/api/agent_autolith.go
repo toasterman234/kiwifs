@@ -47,6 +47,7 @@ type autolithChatPart struct {
 	Text string `json:"text,omitempty"`
 	Name string `json:"name,omitempty"`
 	State map[string]string `json:"state,omitempty"`
+	ToolID string `json:"-"`
 }
 type autolithChatMessage struct {
 	ID string `json:"id"`
@@ -237,14 +238,14 @@ func (a *autolithBridge) onUpdate(data json.RawMessage) {
 		}
 		exists:=false
 		for i:=range s.Assistant.Content {
-			if s.Assistant.Content[i].Type=="tool" && s.Assistant.Content[i].Name==params.Update.ToolCallID {
+			if s.Assistant.Content[i].Type=="tool" && s.Assistant.Content[i].ToolID==params.Update.ToolCallID {
 				s.Assistant.Content[i].State=map[string]string{"status":params.Update.Status}
 				exists=true
 			}
 		}
 		if !exists {
 			s.Assistant.Content=append(s.Assistant.Content,autolithChatPart{
-				Type:"tool",Name:params.Update.Title, State:map[string]string{"status":params.Update.Status},
+				Type:"tool",Name:params.Update.Title, ToolID:params.Update.ToolCallID, State:map[string]string{"status":params.Update.Status},
 			})
 		}
 	}
