@@ -209,12 +209,16 @@ func (b *agentBridge) ownedSession(ctx context.Context, id string) error {
 
 func (s *Server) registerAgentRoutes(api *echo.Group) {
 	b := agentBridgeFromEnvironment()
+	a := autolithBridgeFromEnvironment()
 	api.GET("/agent/info", func(c echo.Context) error {
-		if b == nil {
-			return c.JSON(http.StatusOK, map[string]any{"enabled": false})
-		}
-		return c.JSON(http.StatusOK, map[string]any{"enabled": true, "agent": b.agent})
+		backends := make([]map[string]string, 0, 2)
+		if b != nil { backends = append(backends, map[string]string{"id":"opencode","name":b.agent}) }
+		if a != nil { backends = append(backends, map[string]string{"id":"autolith","name":"Autolith"}) }
+		agent := "Agent chat"
+		if b != nil { agent = b.agent } else if a != nil { agent = "Autolith" }
+		return c.JSON(http.StatusOK, map[string]any{"enabled":len(backends)>0,"agent":agent,"backends":backends})
 	})
+	s.registerAutolithRoutes(api, a)
 	if b == nil {
 		return
 	}
